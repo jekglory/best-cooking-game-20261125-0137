@@ -21,5 +21,8 @@
 ## main.ts rewrite (2026-11-25 ~09:20 WIB, after the first build)
 `main.ts` was rewritten from scratch in this session so that NO line matches the stealth game's `main.ts` that was read as reference: namespace `fs`/`path` imports, aliased `buildDossier as makeDossier`, `import.meta.dirname`, chain-style copy (no helper function), caps as named constants with arithmetic values. Verified by line-set comparison: **0 shared non-blank lines** with the stealth `main.ts`. Re-tested after the rewrite: two runs to different output dirs produce byte-identical output (same dossier sha256), and `game/` output is unchanged. No other old game file was read; the rest of the game (game/src/*, screenshots, README, owner.json) is original work from this session.
 
+## Final commit
+`db52a0f39d5cb8a7b52eee952126d7442ef41981` on `main` (pushed; `ls-remote` HEAD matches). This is the commit to submit.
+
 ## Still to do (parent)
 - Bundle transcripts with the kit CLI, run kit `check` on the exact bundle, check quota, then submit before 13:37Z today. Do NOT claim any prize without Adam's permission.
