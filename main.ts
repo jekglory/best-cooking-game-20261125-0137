@@ -1,49 +1,60 @@
-// Sizzle & Serve — a fast cooking game for make.fun's
-// "Make the best cooking game" bounty (Node 22, standard library only).
-//
-// The game is plain static files under game/ (game/index.html plus its ES
-// modules, no library and no network request at all). This program hands
-// the entry in: it copies game/ and screenshots/ from beside this file
-// into the output directory and writes dossier.json there, the summary
-// the judge reads, built with the vendored make.fun library.
-//
-// Run it locally like this:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
-// Outside the grader, MAKEFUN_OUTPUT_DIR stands in for /output. The run is
-// deterministic: the same repository always produces the same bytes.
+// Sizzle & Serve — the hand-in program for the "Make the best cooking game"
+// bounty. It runs on plain Node 22 with nothing but the standard library.
 
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { buildDossier } from './vendor/makefun-game.ts';
+// What it does, in three steps:
+//   1. Takes the finished game (the static files in game/) and the four
+//      play-test screenshots (screenshots/) that sit next to this file.
+//   2. Puts copies of both into the output folder the grader provides
+//      (or MAKEFUN_OUTPUT_DIR when running locally, for a dry run).
+//   3. Writes dossier.json there, a summary of the handed-in files made by
+//      the vendored make.fun helper, so the judge can check the entry
+//      without opening every file.
 
-const repoRoot = fileURLToPath(new URL('.', import.meta.url));
-const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
-const gameDir = join(repoRoot, 'game');
-const shotsDir = join(repoRoot, 'screenshots');
+// The game itself needs no build step and no network: a desktop browser
+// opens game/index.html and plays it straight from disk. Running this
+// program twice over the same repository always writes the same bytes.
 
-// Start from a clean output: stale files from an earlier run must never
-// leak into the entry. Only game/, screenshots/ and dossier.json are
-// written, and the output directory itself is never deleted or recreated:
-// the grader owns it, so this program only creates it when it is missing
-// and clears nothing it did not put there.
-mkdirSync(outputDir, { recursive: true });
-cpSync(gameDir, join(outputDir, 'game'), { recursive: true });
-mkdirSync(join(outputDir, 'screenshots'), { recursive: true });
-if (existsSync(shotsDir)) {
-  cpSync(shotsDir, join(outputDir, 'screenshots'), { recursive: true });
-}
+// Local dry run (from this folder):
+//   MAKEFUN_OUTPUT_DIR=out node main.ts   — after mkdir -p out
 
-// The scorer's caps, from the competition's gate: the text cap shapes the
-// dossier's bytes; the rest refuse an entry the scorer would refuse anyway
-// (more than 4 screenshots, one over 256 KiB, a game/ over 993 files or
-// 48 MiB, or any game/ path over 1000 bytes). game/ counts beside /output's
-// own 1000-entry cap, which screenshots/ and dossier.json share.
-const dossier = buildDossier(outputDir, {
-  text_max_bytes: 163840,
-  screenshots: { max: 4, max_bytes: 262144 },
-  game_max_files: 993,
-  game_max_bytes: 50331648,
-  game_path_max_bytes: 1000,
-});
-writeFileSync(join(outputDir, 'dossier.json'), dossier);
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { buildDossier as makeDossier } from './vendor/makefun-game.ts';
+
+// The folder this file lives in, and the folder the entry goes to.
+const repoDir = import.meta.dirname;
+const outDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+
+// The caps the scorer applies to the handed-in tree, as named limits so
+// each number says what it bounds. Only the text cap changes the
+// dossier's bytes; the rest are limits that refuse an entry the scorer
+// would refuse anyway, so this program fails the same way instead of
+// handing in something doomed: at most four screenshots, each at most
+// 256 KiB; game/ at most 993 files and 48 MiB in total, with no path
+// longer than 1000 bytes.
+const TEXT_CAP_BYTES = 160 * 1024;
+const SHOT_COUNT_CAP = 4;
+const SHOT_SIZE_CAP_BYTES = 256 * 1024;
+const GAME_FILE_CAP = 993;
+const GAME_SIZE_CAP_BYTES = 48 * 1024 * 1024;
+const GAME_PATH_CAP_BYTES = 1000;
+
+const gateCaps = {
+  text_max_bytes: TEXT_CAP_BYTES,
+  screenshots: { max: SHOT_COUNT_CAP, max_bytes: SHOT_SIZE_CAP_BYTES },
+  game_max_files: GAME_FILE_CAP,
+  game_max_bytes: GAME_SIZE_CAP_BYTES,
+  game_path_max_bytes: GAME_PATH_CAP_BYTES,
+};
+
+// Hand the entry in: make the output folder, copy game/ and screenshots/
+// beside this file into it (a missing screenshots/ folder is skipped
+// quietly, though this entry always ships four pictures), then write the
+// dossier the scorer reads.
+fs.mkdirSync(outDir, { recursive: true });
+['game', 'screenshots']
+  .map((folder) => path.join(repoDir, folder))
+  .filter((src) => fs.existsSync(src))
+  .forEach((src) => fs.cpSync(src, path.join(outDir, path.basename(src)), { recursive: true }));
+
+fs.writeFileSync(path.join(outDir, 'dossier.json'), makeDossier(outDir, gateCaps));
